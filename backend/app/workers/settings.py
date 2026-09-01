@@ -57,6 +57,9 @@ class WorkerSettings:
     redis_settings = redis_settings()
     on_startup = on_startup
     on_shutdown = on_shutdown
-    max_tries = 3
+    max_tries = 2
+    # Blocking work runs via asyncio.to_thread; cap concurrency so a small VPS
+    # isn't running several FFmpeg renders at once.
+    max_jobs = int(settings.WORKER_MAX_JOBS)
     job_timeout = 60 * 60  # 1h - long videos + whisper + ffmpeg
     keep_result = 60 * 60 * 24

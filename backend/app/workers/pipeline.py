@@ -13,6 +13,7 @@ worker. Heavy CPU/IO (whisper, ffmpeg) also runs inline in the task.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import shutil
@@ -162,10 +163,14 @@ async def run_download(ctx: dict[str, Any], project_id: int) -> str:
     workdir = tempfile.mkdtemp(prefix="segmently-dl-", dir=_work_root())
     local = os.path.join(workdir, "source")
     try:
-        remote_title = _fetch_source(url, local, workdir)
+        # These block (network, subprocess, boto3) - run off the event loop so
+        # the arq heartbeat keeps ticking and other jobs aren't starved.
+        remote_title = await asyncio.to_thread(_fetch_source, url, local, workdir)
         key = source_key(project_id, "mp4")
-        storage.upload_file(local, key, content_type="video/mp4")
-        duration = _ffprobe_duration(local)
+        await asyncio.to_thread(
+            storage.upload_file, local, key, content_type="video/mp4"
+        )
+        duration = await asyncio.to_thread(_ffprobe_duration, local)
         size = os.path.getsize(local)
         with _session() as db:
             project = _load_project(db, project_id)
@@ -387,8 +392,8 @@ async def run_transcribe(ctx: dict[str, Any], project_id: int) -> str:
         workdir = tempfile.mkdtemp(prefix="segmently-tr-", dir=_work_root())
         local = os.path.join(workdir, "source")
         try:
-            storage.download_file(key, local)
-            result = transcription.transcribe(local)
+            await asyncio.to_thread(storage.download_file, key, local)
+            result = await asyncio.to_thread(transcription.transcribe, local)
             with _session() as db:
                 project = _load_project(db, project_id)
                 job = _get_or_create_job(db, project_id, JobType.transcribe)
@@ -442,7 +447,9 @@ async def run_segment(ctx: dict[str, Any], project_id: int) -> str:
         user_id = project.user_id
 
     try:
-        detected = segmentation.detect_segments(transcript_payload)
+        detected = await asyncio.to_thread(
+            segmentation.detect_segments, transcript_payload
+        )
     except Exception as exc:  # noqa: BLE001
         logger.exception("run_segment failed for %s", project_id)
         with _session() as db:
@@ -536,7 +543,8 @@ async def run_render(ctx: dict[str, Any], clip_id: int) -> str:
         raise RuntimeError("run_render: project has no source storage_key")
 
     try:
-        out_key = rendering.render_clip(
+        out_key = await asyncio.to_thread(
+            rendering.render_clip,
             ctx_data["source_key"],
             ctx_data["start"],
             ctx_data["end"],
