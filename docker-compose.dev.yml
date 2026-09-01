@@ -1,0 +1,44 @@
+# ---------------------------------------------------------------------------
+# Development override - hot reload, source bind-mounts, no nginx.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+#   api    -> uvicorn --reload on :8000  (backend/ bind-mounted)
+#   worker -> arq --watch                (backend/ bind-mounted)
+#   web    -> vite dev server on :3000   (frontend/ bind-mounted, no nginx build)
+# ---------------------------------------------------------------------------
+
+services:
+  api:
+    build:
+      target: runtime
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    volumes:
+      - ./backend:/app
+    environment:
+      DEBUG: "true"
+    # keep pyc/venv out of the mount so the image's copies win
+    # (venv lives at /opt/venv, not /app, so the bind mount is safe)
+
+  worker:
+    command: ["arq", "app.workers.settings.WorkerSettings", "--watch", "/app"]
+    volumes:
+      - ./backend:/app
+    environment:
+      DEBUG: "true"
+
+  web:
+    # Drop the nginx multi-stage build; run Vite's dev server instead.
+    build: !reset null
+    image: node:20-alpine
+    working_dir: /app
+    command: ["sh", "-c", "npm install && npm run dev -- --host 0.0.0.0 --port 3000"]
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    depends_on:
+      - api

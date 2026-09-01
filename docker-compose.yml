@@ -1,0 +1,157 @@
+# ---------------------------------------------------------------------------
+# Segmently - full local stack.
+#
+#   docker compose up -d --build
+#   docker compose exec api alembic upgrade head
+#   open http://localhost:3000        (web)
+#   open http://localhost:8000/health (api)
+#   open http://localhost:9001        (MinIO console)
+#
+# For hot-reload development use the override file:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# ---------------------------------------------------------------------------
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-segmently}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-segmently}
+      POSTGRES_DB: ${POSTGRES_DB:-segmently}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-segmently} -d ${POSTGRES_DB:-segmently}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
+    volumes:
+      - redisdata:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${STORAGE_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${STORAGE_SECRET_KEY:-minioadmin}
+    volumes:
+      - miniodata:/data
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # web console
+    healthcheck:
+      test: ["CMD-SHELL", "mc ready local || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # One-shot: create the media bucket, then exit.
+  createbuckets:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 '${STORAGE_ACCESS_KEY:-minioadmin}' '${STORAGE_SECRET_KEY:-minioadmin}' &&
+      mc mb --ignore-existing local/'${STORAGE_BUCKET:-segmently-media}' &&
+      echo 'bucket ${STORAGE_BUCKET:-segmently-media} ready' &&
+      exit 0
+      "
+    restart: "no"
+
+  api:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # Sensible in-cluster defaults; .env overrides these.
+      DATABASE_URL: ${DATABASE_URL:-postgresql://segmently:segmently@db:5432/segmently}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      STORAGE_ENDPOINT_URL: ${STORAGE_ENDPOINT_URL:-http://minio:9000}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-segmently-media}
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-minioadmin}
+      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:-minioadmin}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  worker:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    # The media pipeline worker. The arq WorkerSettings module is added by the
+    # Phase 2 BACKEND-AGENT (app/workers/settings.py -> class WorkerSettings).
+    # Until then this service will restart until that module exists; comment it
+    # out or use the placeholder below if you need a quiet `up`.
+    command: ["arq", "app.workers.settings.WorkerSettings"]
+    # placeholder: command: ["python", "-c", "import time; print('worker idle - WorkerSettings not implemented yet', flush=True); [time.sleep(3600) for _ in iter(int, 1)]"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://segmently:segmently@db:5432/segmently}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      STORAGE_ENDPOINT_URL: ${STORAGE_ENDPOINT_URL:-http://minio:9000}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-segmently-media}
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-minioadmin}
+      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:-minioadmin}
+      # Persist the downloaded faster-whisper model across container recreates.
+      HF_HOME: /models/huggingface
+    volumes:
+      - whispercache:/models
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    restart: unless-stopped
+    ports:
+      - "3000:8080"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:
+  whispercache:

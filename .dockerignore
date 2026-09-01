@@ -1,0 +1,34 @@
+# Root build-context ignore. Each service (backend/, frontend/) also has its
+# own .dockerignore; this one keeps repo-level cruft out of any build context.
+.git/
+.github/
+.claude/
+*.md
+!README.md
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+.ruff_cache/
+.mypy_cache/
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Compose / infra files are not needed inside images
+docker-compose*.yml
+
+# OS
+.DS_Store
+Thumbs.db

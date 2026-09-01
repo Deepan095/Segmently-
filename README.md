@@ -160,3 +160,69 @@ npm run dev
 # Docker
 docker-compose up -d
 ```
+
+---
+
+## Running with Docker
+
+The full stack (API, media worker, Postgres, Redis, MinIO, web) runs with Docker Compose.
+
+### Prerequisites
+
+- Docker Engine 24+ and the Docker Compose v2 plugin (`docker compose`)
+
+### First run
+
+```bash
+# 1. Create your env file
+cp .env.example .env        # defaults already target the compose network
+
+# 2. Build and start everything
+docker compose up -d --build
+
+# 3. Create the object-storage bucket (one-shot; also runs automatically)
+docker compose run --rm createbuckets
+
+# 4. Apply database migrations
+docker compose exec api alembic upgrade head
+```
+
+### Services & ports
+
+| Service        | URL / Port                        | Notes                                            |
+|----------------|-----------------------------------|--------------------------------------------------|
+| `web`          | http://localhost:3000             | React SPA served by nginx                        |
+| `api`          | http://localhost:8000             | FastAPI; health check at `/health`               |
+| `worker`       | -                                 | `arq` media pipeline (shares the backend image, includes FFmpeg) |
+| `db`           | localhost:5432                    | PostgreSQL 16, database `segmently`, volume `pgdata` |
+| `redis`        | localhost:6379                    | Queue broker, volume `redisdata`                 |
+| `minio`        | http://localhost:9000 (API), http://localhost:9001 (console) | S3-compatible storage, volume `miniodata` |
+| `createbuckets`| -                                 | One-shot: creates `STORAGE_BUCKET` in MinIO then exits |
+
+The `api` and `worker` services are built from the **same** `backend/Dockerfile`.
+FFmpeg is installed in that image because the worker renders clips with it.
+
+### Development (hot reload)
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+```
+
+This override bind-mounts `backend/` and `frontend/`, runs `uvicorn --reload`,
+runs the worker with `arq --watch`, and replaces the nginx `web` container with
+the Vite dev server on http://localhost:3000.
+
+### Common commands
+
+```bash
+docker compose logs -f api worker      # tail logs
+docker compose exec api bash           # shell into the API container
+docker compose exec api alembic upgrade head
+docker compose down                    # stop
+docker compose down -v                 # stop and wipe volumes (db/redis/minio data)
+```
+
+> Note: the `worker` service runs `arq app.workers.settings.WorkerSettings`.
+> That module is added by the Phase 2 backend work; until it exists the worker
+> container will restart-loop. Comment the service out or switch it to the
+> documented placeholder command in `docker-compose.yml` if you need a quiet start.
