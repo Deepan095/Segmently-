@@ -357,7 +357,17 @@ def _download_url(url: str, dest: str) -> None:
     max_bytes = settings.MAX_UPLOAD_BYTES
     written = 0
     current = url
-    with httpx.Client(follow_redirects=False, timeout=60.0) as client:
+    # A browser-like UA - many hosts 403 the default httpx agent.
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+        ),
+        "Accept": "*/*",
+    }
+    with httpx.Client(
+        follow_redirects=False, timeout=60.0, headers=headers
+    ) as client:
         for _hop in range(_MAX_REDIRECTS + 1):
             validate_public_url(current)
             with client.stream("GET", current) as resp:
