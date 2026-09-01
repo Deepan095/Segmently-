@@ -83,16 +83,22 @@ def _transcribe_faster_whisper(path: str) -> TranscriptionResult:
 # --- openai audio API ------------------------------------------------------
 
 def _extract_audio(path: str) -> str:
-    """Extract a small mono 16 kHz Opus track from *path* for API upload."""
-    out = tempfile.mkstemp(prefix="segmently-audio-", suffix=".ogg")[1]
+    """Extract a small mono 16 kHz audio track from *path* for API upload.
+
+    Uses the native ``aac`` encoder in an ``.m4a`` container - always present in
+    a stock FFmpeg build (unlike ``libopus``/``libmp3lame``) and small enough
+    (~4 MB/hour) to stay under the API's 25 MB limit.
+    """
+    fd, out = tempfile.mkstemp(prefix="segmently-audio-", suffix=".m4a")
+    os.close(fd)  # let ffmpeg own the file
     cmd = [
         settings.FFMPEG_BINARY, "-y", "-i", path,
         "-vn", "-ac", "1", "-ar", "16000",
-        "-c:a", "libopus", "-b:a", "16k",
-        out,
+        "-c:a", "aac", "-b:a", "48k",
+        "-f", "mp4", out,
     ]
-    proc = subprocess.run(cmd, capture_output=True, text=True)
-    if proc.returncode != 0 or not os.path.exists(out):
+    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
+    if proc.returncode != 0 or not os.path.exists(out) or os.path.getsize(out) == 0:
         raise RuntimeError(f"ffmpeg audio extraction failed: {proc.stderr[-500:]}")
     return out
 
