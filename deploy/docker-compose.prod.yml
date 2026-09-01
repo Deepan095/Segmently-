@@ -1,15 +1,23 @@
 # ---------------------------------------------------------------------------
-# Production overlay. Use together with the base file:
+# Production overlay - integrates with an EXISTING Traefik reverse proxy
+# (the Hostinger "Ubuntu + n8n" image ships Traefik on :80/:443).
 #
 #   docker compose -f docker-compose.yml -f deploy/docker-compose.prod.yml \
 #     --env-file deploy/.env.prod up -d --build
 #
-# Differences from the base stack:
-#   * db / redis / minio are NOT published on host ports (internal only)
-#   * api / web are NOT published either - Caddy is the only public entrypoint
-#   * a Caddy service terminates TLS for segmently.online + s3.segmently.online
-#   * MinIO console is disabled
+#   * db / redis / worker            : internal only, no published ports
+#   * web / api / minio              : reachable by Traefik on the shared
+#                                      `edge` network + routed by labels
+#   * TLS: Traefik's existing `mytlschallenge` (Let's Encrypt) resolver
+#
+# The external network name below must match the running Traefik's network.
+# Check with:  docker inspect n8n-traefik-1 --format '{{json .NetworkSettings.Networks}}'
 # ---------------------------------------------------------------------------
+
+networks:
+  edge:
+    external: true
+    name: n8n_default
 
 services:
   db:
@@ -21,18 +29,34 @@ services:
   minio:
     command: server /data --address ":9000" --console-address "127.0.0.1:9001"
     ports: !reset []
+    networks: [default, edge]
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=n8n_default
+      - "traefik.http.routers.segmently-s3.rule=Host(`s3.segmently.online`)"
+      - traefik.http.routers.segmently-s3.entrypoints=web,websecure
+      - traefik.http.routers.segmently-s3.tls=true
+      - traefik.http.routers.segmently-s3.tls.certresolver=mytlschallenge
+      - traefik.http.services.segmently-s3.loadbalancer.server.port=9000
 
   api:
-    # Load the full production env (the base file only sets a handful of vars).
     env_file:
       - deploy/.env.prod
     ports: !reset []
+    networks: [default, edge]
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=n8n_default
+      - "traefik.http.routers.segmently-api.rule=Host(`segmently.online`) && (PathPrefix(`/api`) || Path(`/health`))"
+      - traefik.http.routers.segmently-api.priority=100
+      - traefik.http.routers.segmently-api.entrypoints=web,websecure
+      - traefik.http.routers.segmently-api.tls=true
+      - traefik.http.routers.segmently-api.tls.certresolver=mytlschallenge
+      - traefik.http.services.segmently-api.loadbalancer.server.port=8000
 
   worker:
     env_file:
       - deploy/.env.prod
-    # One render at a time keeps CPU predictable on a small VPS. Scale with
-    #   docker compose ... up -d --scale worker=2
     deploy:
       resources:
         limits:
@@ -42,28 +66,19 @@ services:
     build:
       context: ./frontend
       args:
-        VITE_API_URL: ${VITE_API_URL:?set VITE_API_URL in .env.prod}
+        VITE_API_URL: ${VITE_API_URL:?set VITE_API_URL in deploy/.env.prod}
     ports: !reset []
-
-  caddy:
-    image: caddy:2-alpine
-    restart: unless-stopped
-    depends_on:
-      - web
-      - api
-      - minio
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    environment:
-      SITE_DOMAIN: ${SITE_DOMAIN:?set SITE_DOMAIN in .env.prod}
-      S3_DOMAIN: ${S3_DOMAIN:?set S3_DOMAIN in .env.prod}
-      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env.prod}
-
-volumes:
-  caddy_data:
-  caddy_config:
+    networks: [default, edge]
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=n8n_default
+      - "traefik.http.routers.segmently-web.rule=Host(`segmently.online`) || Host(`www.segmently.online`)"
+      - traefik.http.routers.segmently-web.priority=1
+      - traefik.http.routers.segmently-web.entrypoints=web,websecure
+      - traefik.http.routers.segmently-web.tls=true
+      - traefik.http.routers.segmently-web.tls.certresolver=mytlschallenge
+      - traefik.http.services.segmently-web.loadbalancer.server.port=8080
+      - traefik.http.routers.segmently-web.middlewares=segmently-www
+      - "traefik.http.middlewares.segmently-www.redirectregex.regex=^https://www\\.segmently\\.online/(.*)"
+      - "traefik.http.middlewares.segmently-www.redirectregex.replacement=https://segmently.online/$${1}"
+      - traefik.http.middlewares.segmently-www.redirectregex.permanent=true
