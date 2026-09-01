@@ -82,6 +82,20 @@ def _transcribe_faster_whisper(path: str) -> TranscriptionResult:
 
 # --- openai audio API ------------------------------------------------------
 
+def _has_audio_stream(path: str) -> bool:
+    """True if *path* contains at least one audio stream."""
+    probe = getattr(settings, "FFPROBE_BINARY", "ffprobe")
+    try:
+        r = subprocess.run(
+            [probe, "-v", "error", "-select_streams", "a", "-show_entries",
+             "stream=codec_type", "-of", "csv=p=0", path],
+            capture_output=True, text=True, timeout=30,
+        )
+        return "audio" in r.stdout
+    except (subprocess.SubprocessError, OSError):
+        return True  # can't tell - let the extraction attempt decide
+
+
 def _extract_audio(path: str) -> str:
     """Extract a small mono 16 kHz audio track from *path* for API upload.
 
@@ -89,6 +103,10 @@ def _extract_audio(path: str) -> str:
     a stock FFmpeg build (unlike ``libopus``/``libmp3lame``) and small enough
     (~4 MB/hour) to stay under the API's 25 MB limit.
     """
+    if not _has_audio_stream(path):
+        raise RuntimeError(
+            "This video has no audio track, so there is nothing to transcribe."
+        )
     fd, out = tempfile.mkstemp(prefix="segmently-audio-", suffix=".m4a")
     os.close(fd)  # let ffmpeg own the file
     cmd = [
