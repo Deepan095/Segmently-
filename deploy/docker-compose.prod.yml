@@ -72,13 +72,21 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=n8n_default
-      - "traefik.http.routers.segmently-web.rule=Host(`segmently.online`) || Host(`www.segmently.online`)"
+      # apex - its own cert, never coupled to www so www DNS can't block renewal
+      - "traefik.http.routers.segmently-web.rule=Host(`segmently.online`)"
       - traefik.http.routers.segmently-web.priority=1
       - traefik.http.routers.segmently-web.entrypoints=web,websecure
       - traefik.http.routers.segmently-web.tls=true
       - traefik.http.routers.segmently-web.tls.certresolver=mytlschallenge
       - traefik.http.services.segmently-web.loadbalancer.server.port=8080
-      - traefik.http.routers.segmently-web.middlewares=segmently-www
-      - "traefik.http.middlewares.segmently-www.redirectregex.regex=^https://www\\.segmently\\.online/(.*)"
+      # www -> apex redirect, separate router + cert
+      - "traefik.http.routers.segmently-www.rule=Host(`www.segmently.online`)"
+      - traefik.http.routers.segmently-www.priority=1
+      - traefik.http.routers.segmently-www.entrypoints=web,websecure
+      - traefik.http.routers.segmently-www.tls=true
+      - traefik.http.routers.segmently-www.tls.certresolver=mytlschallenge
+      - traefik.http.routers.segmently-www.service=segmently-web
+      - traefik.http.routers.segmently-www.middlewares=segmently-www
+      - "traefik.http.middlewares.segmently-www.redirectregex.regex=^https?://www\\.segmently\\.online/(.*)"
       - "traefik.http.middlewares.segmently-www.redirectregex.replacement=https://segmently.online/$${1}"
       - traefik.http.middlewares.segmently-www.redirectregex.permanent=true
