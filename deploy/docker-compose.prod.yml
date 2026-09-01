@@ -79,14 +79,16 @@ services:
       - traefik.http.routers.segmently-web.tls=true
       - traefik.http.routers.segmently-web.tls.certresolver=mytlschallenge
       - traefik.http.services.segmently-web.loadbalancer.server.port=8080
-      # www -> apex redirect, separate router + cert
-      - "traefik.http.routers.segmently-www.rule=Host(`www.segmently.online`)"
-      - traefik.http.routers.segmently-www.priority=1
-      - traefik.http.routers.segmently-www.entrypoints=web,websecure
-      - traefik.http.routers.segmently-www.tls=true
-      - traefik.http.routers.segmently-www.tls.certresolver=mytlschallenge
-      - traefik.http.routers.segmently-www.service=segmently-web
-      - traefik.http.routers.segmently-www.middlewares=segmently-www
-      - "traefik.http.middlewares.segmently-www.redirectregex.regex=^https?://www\\.segmently\\.online/(.*)"
-      - "traefik.http.middlewares.segmently-www.redirectregex.replacement=https://segmently.online/$${1}"
-      - traefik.http.middlewares.segmently-www.redirectregex.permanent=true
+      # www -> apex redirect, separate router + cert.
+      # Enable ONLY after an `A www -> <VPS IP>` record exists, or Traefik will
+      # burn Let's Encrypt failed-auth rate limit retrying a missing name.
+      # - "traefik.http.routers.segmently-www.rule=Host(`www.segmently.online`)"
+      # - traefik.http.routers.segmently-www.priority=1
+      # - traefik.http.routers.segmently-www.entrypoints=web,websecure
+      # - traefik.http.routers.segmently-www.tls=true
+      # - traefik.http.routers.segmently-www.tls.certresolver=mytlschallenge
+      # - traefik.http.routers.segmently-www.service=segmently-web
+      # - traefik.http.routers.segmently-www.middlewares=segmently-www
+      # - "traefik.http.middlewares.segmently-www.redirectregex.regex=^https?://www\\.segmently\\.online/(.*)"
+      # - "traefik.http.middlewares.segmently-www.redirectregex.replacement=https://segmently.online/$${1}"
+      # - traefik.http.middlewares.segmently-www.redirectregex.permanent=true
