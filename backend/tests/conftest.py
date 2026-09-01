@@ -132,7 +132,7 @@ def _fake_render_clip(source_key, start, end, captions, style, *, project_id, cl
 
 def _fake_download_file(key: str, local_path: str) -> str:
     with open(local_path, "wb") as fh:
-        fh.write(b"fake-media-bytes")
+        fh.write(b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 4096)  # > 1 KiB, mp4-ish
     return local_path
 
 
@@ -223,6 +223,9 @@ def _external_fakes(monkeypatch: pytest.MonkeyPatch, fake_enqueue: AsyncMock) ->
         "app.workers.pipeline._download_url",
         lambda url, dest: _fake_download_file("remote", dest) and None,
         raising=False,
+    )
+    monkeypatch.setattr(
+        "app.workers.pipeline._ffprobe_duration", lambda path: 42.0, raising=False
     )
 
     # --- reset the in-process auth rate limiter ----------------------

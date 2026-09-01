@@ -225,7 +225,7 @@ async def test_run_download_youtube_url_uses_ytdlp(ctx, db, auth_user, monkeypat
     def _fake_ytdlp(url, dest, workdir):
         calls["url"] = url
         with open(dest, "wb") as fh:
-            fh.write(b"\x00\x00\x00\x18ftypmp42 fake video bytes")
+            fh.write(b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 4096)
         return "Real Video Title"
 
     monkeypatch.setattr("app.workers.pipeline._download_with_ytdlp", _fake_ytdlp)

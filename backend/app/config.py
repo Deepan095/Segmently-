@@ -120,6 +120,7 @@ class Settings(BaseSettings):
     # is cropped out); "crop" = zoom + centre-crop (best for talking heads).
     RENDER_MODE: str = "fit"
     WORKER_MAX_JOBS: int = 2  # arq concurrency cap (blocking work runs in threads)
+    DOWNLOAD_TIMEOUT_SECONDS: int = 1800  # hard cap on a single source download
 
     # --- B-roll (auto stock-footage cutaways) ---
     BROLL_ENABLED: bool = False           # needs PEXELS_API_KEY; opt-in

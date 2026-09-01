@@ -129,9 +129,10 @@ def _ffprobe_duration(path: str) -> float | None:
             capture_output=True,
             text=True,
             check=True,
+            timeout=30,
         )
         return float(out.stdout.strip())
-    except (subprocess.SubprocessError, ValueError):
+    except (subprocess.SubprocessError, ValueError, OSError):
         return None
 
 
@@ -164,13 +165,24 @@ async def run_download(ctx: dict[str, Any], project_id: int) -> str:
     local = os.path.join(workdir, "source")
     try:
         # These block (network, subprocess, boto3) - run off the event loop so
-        # the arq heartbeat keeps ticking and other jobs aren't starved.
-        remote_title = await asyncio.to_thread(_fetch_source, url, local, workdir)
+        # the arq heartbeat keeps ticking and other jobs aren't starved. A hard
+        # wall-clock cap stops a stalled server holding the job forever.
+        remote_title = await asyncio.wait_for(
+            asyncio.to_thread(_fetch_source, url, local, workdir),
+            timeout=settings.DOWNLOAD_TIMEOUT_SECONDS,
+        )
+        if not os.path.exists(local) or os.path.getsize(local) < 1024:
+            raise RuntimeError("The URL did not return a downloadable video file.")
+        duration = await asyncio.to_thread(_ffprobe_duration, local)
+        if duration is None:
+            raise RuntimeError(
+                "That link isn't a video file (FFmpeg couldn't read it). Use a "
+                "direct video URL or upload the file."
+            )
         key = source_key(project_id, "mp4")
         await asyncio.to_thread(
             storage.upload_file, local, key, content_type="video/mp4"
         )
-        duration = await asyncio.to_thread(_ffprobe_duration, local)
         size = os.path.getsize(local)
         with _session() as db:
             project = _load_project(db, project_id)
