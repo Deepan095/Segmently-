@@ -284,13 +284,32 @@ def _download_with_ytdlp(url: str, dest: str, workdir: str) -> str | None:
         "retries": 3,
         "socket_timeout": 60,
         "max_filesize": settings.MAX_UPLOAD_BYTES,
+        # YouTube blocks bare requests from datacenter IPs ("Sign in to confirm
+        # you're not a bot"). Trying several player clients dodges it for many
+        # videos; a cookies file (YTDLP_COOKIES_FILE) is the reliable fallback.
+        "extractor_args": {
+            "youtube": {"player_client": ["web_safari", "mweb", "tv", "android", "default"]}
+        },
     }
+    cookies = settings.YTDLP_COOKIES_FILE
+    if cookies and os.path.exists(cookies):
+        ydl_opts["cookiefile"] = cookies
+        logger.info("yt-dlp: using cookies file %s", cookies)
     # Only pin ffmpeg's location when an absolute path is configured; otherwise
     # let yt-dlp find it on PATH (a bare "ffmpeg" here breaks yt-dlp's lookup).
     if os.path.isabs(settings.FFMPEG_BINARY):
         ydl_opts["ffmpeg_location"] = settings.FFMPEG_BINARY
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=True)
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+    except Exception as exc:  # noqa: BLE001 - yt-dlp errors carry unpicklable tracebacks
+        msg = str(exc).replace("\n", " ")[:400]
+        if "confirm you" in msg or "bot" in msg or "cookies" in msg.lower():
+            raise RuntimeError(
+                "YouTube is blocking downloads from this server's IP. Add a "
+                "cookies.txt (YTDLP_COOKIES_FILE) or upload the file directly."
+            ) from None
+        raise RuntimeError(f"yt-dlp could not fetch this URL: {msg}") from None
 
     produced = [
         os.path.join(workdir, f)

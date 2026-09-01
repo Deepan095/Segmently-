@@ -113,6 +113,9 @@ class Settings(BaseSettings):
     FFPROBE_BINARY: str = "ffprobe"
     FFMPEG_PRESET: str = "superfast"  # x264 speed/size trade-off for clip renders
     YTDLP_MAX_HEIGHT: int = 720  # cap yt-dlp source resolution (clips are 1080 wide)
+    # Netscape-format cookies.txt for YouTube etc. (datacenter IPs get bot-blocked
+    # without one). Mounted into the worker; blank = no cookies.
+    YTDLP_COOKIES_FILE: str = "/cookies/youtube.txt"
     # "fit" = whole frame over a blurred fill (screen recordings, slides - nothing
     # is cropped out); "crop" = zoom + centre-crop (best for talking heads).
     RENDER_MODE: str = "fit"

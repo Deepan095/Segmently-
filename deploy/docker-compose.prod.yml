@@ -57,6 +57,11 @@ services:
   worker:
     env_file:
       - deploy/.env.prod
+    volumes:
+      # Drop a Netscape cookies.txt at deploy/cookies/youtube.txt to let yt-dlp
+      # fetch YouTube from this datacenter IP. Optional - direct uploads and many
+      # non-YouTube URLs work without it.
+      - ./deploy/cookies:/cookies:ro
     deploy:
       resources:
         limits:
