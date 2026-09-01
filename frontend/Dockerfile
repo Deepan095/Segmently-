@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 # ---------------------------------------------------------------------------
 # Segmently frontend image: build the Vite/React app, then serve the static
 # bundle with nginx (SPA fallback). Runs as a non-root user.
