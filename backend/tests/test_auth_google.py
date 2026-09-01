@@ -89,6 +89,7 @@ async def test_exchange_failure_raises(monkeypatch):
 # --------------------------------------------------------------------------- #
 def test_google_login_redirects(client, monkeypatch):
     monkeypatch.setattr("app.routers.auth.settings.GOOGLE_CLIENT_ID", "cid-1")
+    monkeypatch.setattr("app.routers.auth.settings.GOOGLE_CLIENT_SECRET", "secret-1")
     resp = client.get("/api/v1/auth/google/login", follow_redirects=False)
     assert resp.status_code == 302
     assert "accounts.google.com" in resp.headers["location"]
@@ -97,6 +98,16 @@ def test_google_login_redirects(client, monkeypatch):
 def test_google_login_unconfigured(client, monkeypatch):
     monkeypatch.setattr("app.routers.auth.settings.GOOGLE_CLIENT_ID", "")
     assert client.get("/api/v1/auth/google/login", follow_redirects=False).status_code == 422
+
+
+def test_auth_providers_reports_google_state(client, monkeypatch):
+    monkeypatch.setattr("app.routers.auth.settings.GOOGLE_CLIENT_ID", "")
+    monkeypatch.setattr("app.routers.auth.settings.GOOGLE_CLIENT_SECRET", "")
+    assert client.get("/api/v1/auth/providers").json() == {"google": False}
+
+    monkeypatch.setattr("app.routers.auth.settings.GOOGLE_CLIENT_ID", "cid-1")
+    monkeypatch.setattr("app.routers.auth.settings.GOOGLE_CLIENT_SECRET", "secret-1")
+    assert client.get("/api/v1/auth/providers").json() == {"google": True}
 
 
 def test_google_callback_provisions_user_and_redirects(client, db, fake_google_http):

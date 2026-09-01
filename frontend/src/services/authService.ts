@@ -109,3 +109,13 @@ export async function updateProfile(payload: UpdateProfilePayload): Promise<User
 export function googleLoginUrl(): string {
   return `${import.meta.env.VITE_API_URL}/api/v1/auth/google/login`;
 }
+
+export interface AuthProviders {
+  google: boolean;
+}
+
+/** Which third-party sign-in options this deployment has configured. */
+export async function getAuthProviders(): Promise<AuthProviders> {
+  const { data } = await api.get<AuthProviders>('/auth/providers');
+  return data;
+}

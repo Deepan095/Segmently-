@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './context/AuthContext';
+import { LandingPage } from './pages/LandingPage';
 import { authRoutes } from './pages/authRoutes';
 import { projectRoutes } from './pages/projectRoutes';
 import { clipRoutes } from './pages/clipRoutes';
@@ -27,7 +28,7 @@ export default function App() {
       <AuthProvider>
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/" element={<LandingPage />} />
 
             {authRoutes}
             {dashboardRoutes}
@@ -35,7 +36,7 @@ export default function App() {
             {clipRoutes}
             {adminRoutes}
 
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>
       </AuthProvider>

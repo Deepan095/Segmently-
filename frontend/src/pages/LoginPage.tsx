@@ -5,12 +5,14 @@ import { GlassCard } from '../components/ui/GlassCard';
 import { LoginForm } from '../components/auth/LoginForm';
 import { GoogleLoginButton } from '../components/auth/GoogleLoginButton';
 import { useAuth } from '../hooks/useAuth';
+import { useAuthProviders } from '../hooks/useAuthProviders';
 
 const MotionLink = motion(Link);
 
 export function LoginPage() {
   const navigate = useNavigate();
   const { user, isLoading } = useAuth();
+  const { google } = useAuthProviders();
 
   if (!isLoading && user) {
     return <Navigate to="/dashboard" replace />;
@@ -27,13 +29,16 @@ export function LoginPage() {
 
         <LoginForm onSuccess={() => navigate('/dashboard')} />
 
-        <div className="my-5 flex items-center gap-3 text-xs uppercase tracking-wide text-gray-400">
-          <span className="h-px flex-1 bg-gray-200" />
-          <span>or</span>
-          <span className="h-px flex-1 bg-gray-200" />
-        </div>
-
-        <GoogleLoginButton />
+        {google ? (
+          <>
+            <div className="my-5 flex items-center gap-3 text-xs uppercase tracking-wide text-gray-400">
+              <span className="h-px flex-1 bg-gray-200" />
+              <span>or</span>
+              <span className="h-px flex-1 bg-gray-200" />
+            </div>
+            <GoogleLoginButton />
+          </>
+        ) : null}
 
         <div className="mt-6 flex flex-col items-center gap-2 text-sm text-gray-600">
           <MotionLink

@@ -5,12 +5,14 @@ import { GlassCard } from '../components/ui/GlassCard';
 import { RegisterForm } from '../components/auth/RegisterForm';
 import { GoogleLoginButton } from '../components/auth/GoogleLoginButton';
 import { useAuth } from '../hooks/useAuth';
+import { useAuthProviders } from '../hooks/useAuthProviders';
 
 const MotionLink = motion(Link);
 
 export function RegisterPage() {
   const navigate = useNavigate();
   const { user, isLoading } = useAuth();
+  const { google } = useAuthProviders();
 
   if (!isLoading && user) {
     return <Navigate to="/dashboard" replace />;
@@ -27,13 +29,16 @@ export function RegisterPage() {
 
         <RegisterForm onSuccess={() => navigate('/dashboard')} />
 
-        <div className="my-5 flex items-center gap-3 text-xs uppercase tracking-wide text-gray-400">
-          <span className="h-px flex-1 bg-gray-200" />
-          <span>or</span>
-          <span className="h-px flex-1 bg-gray-200" />
-        </div>
-
-        <GoogleLoginButton label="Sign up with Google" />
+        {google ? (
+          <>
+            <div className="my-5 flex items-center gap-3 text-xs uppercase tracking-wide text-gray-400">
+              <span className="h-px flex-1 bg-gray-200" />
+              <span>or</span>
+              <span className="h-px flex-1 bg-gray-200" />
+            </div>
+            <GoogleLoginButton label="Sign up with Google" />
+          </>
+        ) : null}
 
         <p className="mt-6 text-center text-sm text-gray-600">
           Already have an account?{' '}

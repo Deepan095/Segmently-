@@ -130,11 +130,19 @@ async def update_me(
     )
 
 
+@router.get("/providers")
+async def auth_providers() -> dict[str, bool]:
+    """Which third-party sign-in options are available (drives the login UI)."""
+    return {
+        "google": bool(settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET)
+    }
+
+
 @router.get("/google/login")
 async def google_login() -> RedirectResponse:
     """Begin the Google OAuth flow (redirects to Google with a signed state)."""
-    if not settings.GOOGLE_CLIENT_ID:
-        raise ValidationError("Google OAuth is not configured")
+    if not (settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET):
+        raise ValidationError("Google sign-in is not configured for this site.")
     state = oauth.create_oauth_state()
     url = oauth.build_authorization_url(state)
     response = RedirectResponse(url, status_code=302)
