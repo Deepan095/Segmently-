@@ -357,6 +357,9 @@ def test_transcribe_no_backend_available(tmp_path, monkeypatch):
     monkeypatch.setattr(transcription.settings, "TRANSCRIPTION_BACKEND", "local")
     media = tmp_path / "a.wav"
     media.write_bytes(b"x")
+    # Simulate faster-whisper being absent from the worker image: a None entry in
+    # sys.modules makes `import faster_whisper` raise ImportError.
+    monkeypatch.setitem(sys.modules, "faster_whisper", None)
     with pytest.raises(transcription.TranscriptionUnavailable):
         _REAL_TRANSCRIBE(str(media))
 
