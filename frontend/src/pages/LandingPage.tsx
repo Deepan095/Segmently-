@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { Link, Navigate } from 'react-router-dom';
-import { ArrowRight, Film, Link2, Scissors, Sparkles, Type, Upload } from 'lucide-react';
+import { ArrowRight, Crop, Film, Scissors, Sparkles, Type, Upload } from 'lucide-react';
 import { MeshBackground } from '../components/layout/MeshBackground';
 import { useAuth } from '../hooks/useAuth';
 
@@ -10,7 +10,7 @@ const STEPS = [
   {
     icon: Upload,
     title: 'Add a long video',
-    body: 'Upload a file or paste a link — a podcast, webinar, talk or stream.',
+    body: 'Upload a podcast, webinar, talk or stream — an MP4 or MOV up to a few GB.',
   },
   {
     icon: Sparkles,
@@ -36,9 +36,9 @@ const FEATURES = [
     body: 'Auto-drops relevant stock footage over a few moments while your audio keeps playing.',
   },
   {
-    icon: Link2,
-    title: 'Import or upload',
-    body: 'Direct video links and file uploads, cropped to vertical or fit over a blurred fill.',
+    icon: Crop,
+    title: 'Smart reframing',
+    body: 'Every clip is cropped to a vertical 9:16 or fit over a blurred fill — your call per clip.',
   },
 ];
 

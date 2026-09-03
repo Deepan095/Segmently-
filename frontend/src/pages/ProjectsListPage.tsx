@@ -46,7 +46,7 @@ export function ProjectsListPage() {
             <FolderPlus className="mx-auto h-10 w-10 text-purple-400" />
             <h2 className="mt-3 text-lg font-semibold text-gray-900">No projects yet</h2>
             <p className="mt-1 text-sm text-gray-600">
-              Upload a video or paste a link to get your first clips.
+              Upload a video to get your first clips.
             </p>
             <div className="mt-4 flex justify-center">
               <GradientButton type="button" onClick={() => navigate('/projects/new')}>

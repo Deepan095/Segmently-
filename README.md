@@ -51,8 +51,10 @@ it is deployed.
 From a user's point of view:
 
 1. **Sign up / log in** — email + password, or "Sign in with Google" (when configured).
-2. **Create a project** — upload a video file, or paste a link (YouTube, Vimeo, Twitch,
-   TikTok, and other supported platforms, or a direct `.mp4`/`.mov` URL).
+2. **Create a project** — upload a video file. (Importing from a YouTube / platform link
+   is implemented in the backend but disabled in the UI on the public site, because
+   YouTube blocks the server's datacenter IP; the "Paste URL" tab shows a *coming soon*
+   notice. See *Troubleshooting* and the `YTDLP_PROXY` env var to turn it back on.)
 3. **Wait a few minutes** — Segmently downloads the source, transcribes the audio, asks an
    LLM to pick the best self‑contained ~1‑minute moments, and renders each as a vertical
    clip. You watch the progress bar move through the pipeline stages.
