@@ -116,6 +116,11 @@ class Settings(BaseSettings):
     # Netscape-format cookies.txt for YouTube etc. (datacenter IPs get bot-blocked
     # without one). Mounted into the worker; blank = no cookies.
     YTDLP_COOKIES_FILE: str = "/cookies/youtube.txt"
+    # Proxy for yt-dlp *and* direct-link downloads. YouTube (and many other hosts)
+    # block this server's datacenter IP; routing through a residential/mobile proxy
+    # makes the request look like a normal home connection. Format:
+    # "http://user:pass@host:port" (or socks5://...). Blank = direct connection.
+    YTDLP_PROXY: str = ""
     # "fit" = whole frame over a blurred fill (screen recordings, slides - nothing
     # is cropped out); "crop" = zoom + centre-crop (best for talking heads).
     RENDER_MODE: str = "fit"

@@ -397,6 +397,7 @@ committed.
 | `WHISPER_MODEL` | `tiny`\|`base`\|`small`\|`medium`\|`large-v3` (local backend only). | `base` |
 | `OPENAI_API_KEY` | Required for AI segment selection (and for `TRANSCRIPTION_BACKEND=openai`). | — |
 | `OPENAI_MODEL` | Chat model used to pick the clip moments. | `gpt-4o-mini` |
+| `YTDLP_PROXY` | Proxy for `yt-dlp` + direct‑link downloads (`http://user:pass@host:port` or `socks5://…`). **Needed for YouTube import on a VPS** — datacenter IPs are bot‑blocked. | blank (direct) |
 | `BROLL_ENABLED` / `PEXELS_API_KEY` | Opt‑in stock‑footage cutaways. | `false` / — |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth. **Both** must be set or the "Sign in with Google" button is hidden. | blank |
 | `GOOGLE_REDIRECT_URI` | Must match the redirect URI registered in Google Cloud. | `http://localhost:8000/api/v1/auth/google/callback` |
@@ -524,7 +525,7 @@ in `deploy/.env.prod` (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`), then
 |---|---|
 | API container restart‑loops, logs say "Insecure default value(s)" | `DEBUG=false` with a `CHANGE_ME` / default still in your env file. Fill them in. |
 | Clip plays in the app but download / preview 403s | `STORAGE_PUBLIC_ENDPOINT_URL` must be an address the **browser** can reach (`http://localhost:9000` locally, `https://s3.<domain>` in prod), and that DNS record must exist. |
-| Worker stuck at "downloading" a YouTube URL | YouTube blocks datacenter IPs ("Sign in to confirm you're not a bot"). Direct video URLs and file uploads work. To use YouTube, drop a `cookies.txt` at `deploy/cookies/youtube.txt` and set `YTDLP_COOKIES_FILE`. |
+| Worker stuck at "downloading" a YouTube URL, or "YouTube is blocking downloads from this server's IP" | YouTube blocks datacenter / cloud IPs ("Sign in to confirm you're not a bot"). Direct video URLs and file uploads still work. **Fix:** set `YTDLP_PROXY` to a residential/mobile proxy (`http://user:pass@host:port`) in `deploy/.env.prod` and `./deploy/segmently.sh update`. Alternative: drop a Netscape `cookies.txt` at `deploy/cookies/youtube.txt` (fragile — cookies expire in weeks and can flag the account). |
 | Pasting a YouTube page URL just downloads an HTML file | Old build. Current code routes platform URLs through `yt-dlp`; direct links must end in a video extension. |
 | Transcription errors immediately | `TRANSCRIPTION_BACKEND=openai` needs a valid `OPENAI_API_KEY`; `=local` needs FFmpeg and downloads the whisper model on first run (slow, cached afterwards). |
 | Renders very slow / out of memory | Small machine. Use `RENDER_MODE=crop` (≈3× faster than `fit`), lower `SEGMENTS_TARGET`, or give the worker more CPUs. |

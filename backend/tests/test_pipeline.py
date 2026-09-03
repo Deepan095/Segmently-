@@ -294,3 +294,59 @@ async def test_run_segment_no_clips_completes_project(ctx, db, auth_user, monkey
 
     db.expire_all()
     assert db.get(Project, project.id).status == ProjectStatus.completed
+
+
+def _fake_youtube_dl(tmp_path):
+    """Return a fake ``yt_dlp.YoutubeDL`` class that records the opts it was
+    built with and writes a tiny MP4 into *tmp_path* on ``extract_info``."""
+    captured: dict = {}
+
+    class _FakeYDL:
+        def __init__(self, opts):
+            captured["opts"] = opts
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def extract_info(self, url, download):
+            (tmp_path / "ytdl.mp4").write_bytes(
+                b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 4096
+            )
+            return {"title": "Vid"}
+
+    return _FakeYDL, captured
+
+
+def test_download_with_ytdlp_routes_through_proxy_when_configured(tmp_path, monkeypatch):
+    import yt_dlp
+
+    fake_ydl, captured = _fake_youtube_dl(tmp_path)
+    monkeypatch.setattr(yt_dlp, "YoutubeDL", fake_ydl)
+    monkeypatch.setattr(
+        "app.workers.pipeline.settings.YTDLP_PROXY",
+        "http://user:pass@10.0.0.1:8000",
+    )
+
+    title = pipeline._download_with_ytdlp(
+        "https://www.youtube.com/watch?v=x", str(tmp_path / "out"), str(tmp_path)
+    )
+
+    assert title == "Vid"
+    assert captured["opts"]["proxy"] == "http://user:pass@10.0.0.1:8000"
+
+
+def test_download_with_ytdlp_omits_proxy_when_unset(tmp_path, monkeypatch):
+    import yt_dlp
+
+    fake_ydl, captured = _fake_youtube_dl(tmp_path)
+    monkeypatch.setattr(yt_dlp, "YoutubeDL", fake_ydl)
+    monkeypatch.setattr("app.workers.pipeline.settings.YTDLP_PROXY", "")
+
+    pipeline._download_with_ytdlp(
+        "https://www.youtube.com/watch?v=x", str(tmp_path / "out"), str(tmp_path)
+    )
+
+    assert "proxy" not in captured["opts"]

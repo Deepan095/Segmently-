@@ -312,6 +312,9 @@ def _download_with_ytdlp(url: str, dest: str, workdir: str) -> str | None:
     if cookies and os.path.exists(cookies):
         ydl_opts["cookiefile"] = cookies
         logger.info("yt-dlp: using cookies file %s", cookies)
+    if settings.YTDLP_PROXY:
+        ydl_opts["proxy"] = settings.YTDLP_PROXY
+        logger.info("yt-dlp: routing through configured proxy")
     # Only pin ffmpeg's location when an absolute path is configured; otherwise
     # let yt-dlp find it on PATH (a bare "ffmpeg" here breaks yt-dlp's lookup).
     if os.path.isabs(settings.FFMPEG_BINARY):
@@ -323,8 +326,9 @@ def _download_with_ytdlp(url: str, dest: str, workdir: str) -> str | None:
         msg = str(exc).replace("\n", " ")[:400]
         if "confirm you" in msg or "bot" in msg or "cookies" in msg.lower():
             raise RuntimeError(
-                "YouTube is blocking downloads from this server's IP. Add a "
-                "cookies.txt (YTDLP_COOKIES_FILE) or upload the file directly."
+                "YouTube is blocking downloads from this server's IP. Set a "
+                "residential proxy (YTDLP_PROXY), add a cookies.txt "
+                "(YTDLP_COOKIES_FILE), or upload the file directly."
             ) from None
         raise RuntimeError(f"yt-dlp could not fetch this URL: {msg}") from None
 
@@ -366,7 +370,10 @@ def _download_url(url: str, dest: str) -> None:
         "Accept": "*/*",
     }
     with httpx.Client(
-        follow_redirects=False, timeout=60.0, headers=headers
+        follow_redirects=False,
+        timeout=60.0,
+        headers=headers,
+        proxy=settings.YTDLP_PROXY or None,
     ) as client:
         for _hop in range(_MAX_REDIRECTS + 1):
             validate_public_url(current)

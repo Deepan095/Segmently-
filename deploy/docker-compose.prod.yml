@@ -58,9 +58,10 @@ services:
     env_file:
       - deploy/.env.prod
     volumes:
-      # Drop a Netscape cookies.txt at deploy/cookies/youtube.txt to let yt-dlp
-      # fetch YouTube from this datacenter IP. Optional - direct uploads and many
-      # non-YouTube URLs work without it.
+      # YouTube blocks this datacenter IP. Preferred fix: set YTDLP_PROXY in
+      # deploy/.env.prod to a residential/mobile proxy. Alternative: drop a
+      # Netscape cookies.txt at deploy/cookies/youtube.txt (mounted below).
+      # Direct uploads and many non-YouTube URLs work without either.
       - ./deploy/cookies:/cookies:ro
     deploy:
       resources:
