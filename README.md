@@ -419,7 +419,7 @@ The project `status` and each `ProcessingJob` progress are visible in the UI.
 
 | Stage | Job | What happens |
 |---|---|---|
-| **1. Download** | `run_download` | For a **direct video URL** (`.mp4`/`.mov`/…) it streams the file with SSRF protection (private/internal IP ranges are rejected, every redirect hop re‑validated). For an **allow‑listed platform** (YouTube, Vimeo, Twitch, TikTok, Dailymotion, Streamable, Facebook, Instagram) it uses `yt-dlp`. For an **uploaded file** it just pulls it from storage. The result is validated (must be a real video with a readable duration) and stored in the bucket. |
+| **1. Download** | `run_download` | For an **uploaded file** it just pulls it from storage. For a **direct video URL** (`.mp4`/`.mov`/…) it streams the file with SSRF protection (private/internal IP ranges rejected, every redirect hop re‑validated). For an **allow‑listed platform** (YouTube, Vimeo, Twitch, TikTok, …) it uses `yt-dlp` — both paths honour `YTDLP_PROXY`. The result is validated (must be a real video with a readable duration) and stored in the bucket. *(Platform-URL import is disabled in the hosted UI; see Troubleshooting.)* |
 | **2. Transcribe** | `run_transcribe` | Extracts a mono 16 kHz audio track with FFmpeg, then transcribes it — either with a local faster‑whisper model or the OpenAI audio API, depending on `TRANSCRIPTION_BACKEND`. Produces a `Transcript` with word/segment timings. A video with no audio track fails with a clear message. |
 | **3. Segment** | `run_segment` | Splits the transcript into `SEGMENT_WINDOW_SECONDS` (default 600s) windows and asks the LLM to pick roughly one strong self‑contained moment per window (target `SEGMENTS_TARGET`, cap `SEGMENTS_MAX`). Each proposed in/out point is **snapped to real sentence boundaries** and stretched/trimmed to ~45–75s so no clip starts or ends mid‑sentence. Overlapping picks are de‑duplicated (higher score wins). Each surviving pick becomes a `Clip` + `ClipCaption` + a render job. |
 | **4. Render** | `run_render` | FFmpeg builds the vertical clip. `RENDER_MODE=fit` puts the source on a blurred, zoomed copy of itself (good for screen recordings / non‑vertical sources); `crop` cover‑crops with an adjustable `reframe_offset`. Captions are chunked into ≤30‑character cues and burned in as ASS subtitles with safe margins. If B‑roll is enabled, the LLM suggests a few short visual cues and Pexels clips are overlaid over those spans while the original audio continues. Output is a clean 1080×1920 H.264 MP4. |
@@ -578,7 +578,9 @@ in `deploy/.env.prod` (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`), then
 **In (MVP, built and working):**
 
 - Email/password + Google OAuth auth, JWT with refresh rotation
-- Project creation from file upload or platform/direct URL
+- Project creation from file upload (platform/direct **URL import is built but
+  turned off in the hosted UI** — YouTube blocks the server's datacenter IP; set
+  `YTDLP_PROXY` to re‑enable)
 - Auto transcription → AI moment selection → vertical clip rendering with captions
 - Optional auto B‑roll
 - In‑app preview, caption/trim editing, re‑render, signed MP4 download
